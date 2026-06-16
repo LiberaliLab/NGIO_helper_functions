@@ -48,6 +48,56 @@ class ZarrWellIterator:
             except StopIteration:
                 self.well_iter = None
 
+class ROIWellIterator:
+    """
+    Streamlined iterator to iterate through ROIs, returning labels, composite images and cleaned crops.
+    Yields: dict with keys roi, roi_data, roi_data_dapi, roi_data_label,
+            roi_data_dapi_cleaned, roi_data_label_cleaned
+    """
+
+    def __init__(self, well_container, table_name, label_name=None):
+        self.well_container = well_container
+        self.composite = well_container.get_image()
+        self.roi_table = well_container.get_table(table_name)
+        self.roi_iter = iter(self.roi_table.rois())
+
+        self.label_name = label_name or table_name.replace("_masking_ROI_table", "")
+        self.label_container = well_container.get_label(self.label_name)
+
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while True:
+            roi = next(self.roi_iter)
+            try:
+                target_label = roi.label
+
+                roi_data = self.composite.get_roi_as_numpy(roi, c=None)
+                roi_data_dapi = self.composite.get_roi_as_numpy(roi, c=0)
+                roi_data_label = self.label_container.get_roi_as_numpy(roi)
+
+                roi_data_dapi_cleaned = np.squeeze(
+                    ImageCleaning.suppress_neighbors(roi_data_dapi, roi_data_label, target_label)
+                )
+                roi_data_label_cleaned = np.squeeze(
+                    ImageCleaning.suppress_neighbors(roi_data_label, roi_data_label, target_label)
+                )
+
+                return {
+                    "roi": roi,
+                    "target_label": target_label,
+                    "roi_data": roi_data,
+                    "roi_data_dapi": roi_data_dapi,
+                    "roi_data_label": roi_data_label,
+                    "roi_data_dapi_cleaned": roi_data_dapi_cleaned,
+                    "roi_data_label_cleaned": roi_data_label_cleaned,
+                }
+            except Exception as e:
+                logging.error(f"Failed to extract/clean ROI {roi}: {e}")
+                continue
+
 class Formatter:
     """Utility methods for path discovery and metadata parsing."""
 
@@ -64,3 +114,20 @@ class Formatter:
             for p in root.iterdir()
             if p.is_dir() and p.suffix == ".zarr"
         }
+
+class ImageCleaning:
+    @staticmethod
+    def suppress_neighbors(intensity_crop, label_crop, target_label, background_value=None):
+        """
+        intensity_crop: (H, W) single channel
+        label_crop: (H, W) integer label map, same shape
+        target_label: the label ID of YOUR organoid (e.g. 42)
+        Removes background that is not within the label of the image
+        """
+        if background_value is None:
+            bg_mask = (label_crop == 0)
+            background_value = np.median(intensity_crop[bg_mask]) if bg_mask.any() else np.median(intensity_crop)
+        neighbor_mask = (label_crop != target_label) & (label_crop != 0)
+        cleaned = intensity_crop.copy()
+        cleaned[neighbor_mask] = background_value
+        return cleaned
