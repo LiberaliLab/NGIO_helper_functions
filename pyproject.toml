@@ -1,7 +1,15 @@
 [project]
 name = "ngio-helpers"
 version = "0.1.0"
+description = "Custom extensions and iterators for the NGIO ecosystem (OME-Zarr plates/wells)"
+requires-python = ">=3.9"
+dependencies = [
+    "ngio",
+]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
