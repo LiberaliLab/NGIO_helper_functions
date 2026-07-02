@@ -66,6 +66,53 @@ cleaned = ImageCleaning.suppress_neighbors(
 
 This is used internally by `ROIWellIterator` to produce the `_cleaned` fields above, but can also be called directly on any intensity/label crop pair.
 
+## Formatter Class 
+
+Utility class for path discovery and metadata parsing. All methods are stateless.
+
+```python
+from your_package import Formatter
+```
+
+### `collect_zarr_plates(path_zarr)`
+
+Scans a directory and returns a mapping of plate names to their paths.
+
+```python
+plates = Formatter.collect_zarr_plates("/data/experiment/")
+# {"plate_A.zarr": PosixPath("/data/experiment/plate_A.zarr"), ...}
+```
+
+| Argument | Type | Description |
+|---|---|---|
+| `path_zarr` | `str` or `Path` | Root directory to scan for `.zarr` plate folders |
+
+Returns `dict[str, Path]`. Returns an empty dict and logs a warning if the path does not exist.
+
+---
+
+### `rename_FE_image_channels(df, well_container)`
+
+Renames numeric channel suffixes in a feature extraction DataFrame to human-readable channel labels from the OME-Zarr metadata.
+
+```python
+# Before: mean_intensity-0, mean_intensity-1
+# After:  mean_intensity-DAPI, mean_intensity-Olfm4
+
+df = Formatter.rename_FE_image_channels(df, well_container)
+```
+
+| Argument | Type | Description |
+|---|---|---|
+| `df` | `pd.DataFrame` | Feature table as returned by `run_extract` |
+| `well_container` | `ngio.WellContainer` | Well container holding image and channel metadata |
+
+Returns `pd.DataFrame` with channel columns renamed. Columns not matching the `<feature>-<index>` pattern are left unchanged.
+
+
+
+
+---
 ## Project Structure
 
 ```
