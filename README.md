@@ -71,7 +71,7 @@ This is used internally by `ROIWellIterator` to produce the `_cleaned` fields ab
 Utility class for path discovery and metadata parsing. All methods are stateless.
 
 ```python
-from your_package import Formatter
+from ngio_helpers import Formatter
 ```
 
 ### `collect_zarr_plates(path_zarr)`
