@@ -2,7 +2,13 @@
 
 Functions to expand on the [NGIO](https://github.com/BioVisionCenter/ngio.git) library for needs specific to HCS (High-Content Screening) analysis.
 
-## Installation
+## Simple Installation
+
+```bash
+pip install git+[text](https://github.com/LiberaliLab/NGIO_helper_functions.git)
+```
+
+## Installation for development
 
 Clone the repo and install in editable mode:
 
