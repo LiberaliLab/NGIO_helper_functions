@@ -5,7 +5,7 @@ Functions to expand on the [NGIO](https://github.com/BioVisionCenter/ngio.git) l
 ## Simple Installation
 
 ```bash
-pip install git+[text](https://github.com/LiberaliLab/NGIO_helper_functions.git)
+pip install git+https://github.com/LiberaliLab/NGIO_helper_functions.git
 ```
 
 ## Installation for development
