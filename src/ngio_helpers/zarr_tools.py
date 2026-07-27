@@ -14,13 +14,17 @@ import pandas as pd
 class ZarrWellIterator:
     """
     Streamlined iterator to traverse wells across multiple OME-Zarr plates.
+    Accepts either:
+      - {plate_name: plate_path} (from collect_zarr_plates), or
+      - {plate_name: {well_name: well_container}} (e.g. from sample_wells)
     Yields: (plate_name, well_name, well_container)
     """
+
     def __init__(self, zarr_dict):
         self.zarr_items = list(zarr_dict.items())
         self.plate_idx = 0
         self.well_iter = None
-        self.current_plate_name = None # Initialized for safety
+        self.current_plate_name = None
 
     def __iter__(self):
         return self
@@ -31,16 +35,21 @@ class ZarrWellIterator:
                 if self.plate_idx >= len(self.zarr_items):
                     raise StopIteration
 
-                plate_name, plate_path = self.zarr_items[self.plate_idx]
+                plate_name, plate_value = self.zarr_items[self.plate_idx]
                 self.plate_idx += 1
+                self.current_plate_name = plate_name
 
-                try:
-                    plate = open_ome_zarr_plate(plate_path)
-                    self.current_plate_name = plate_name
-                    self.well_iter = iter(plate.get_images().items()) # Get the dictionary of well name: well container 
-                except Exception as e:
-                    logging.error(f"Failed to open plate {plate_name}: {e}")
-                    continue # Skip to the next plate if one is corrupt
+                if isinstance(plate_value, dict):
+                    # Already {well_name: well_container} — no need to open the plate
+                    self.well_iter = iter(plate_value.items())
+                else:
+                    # It's a path — open the plate and get its wells
+                    try:
+                        plate = open_ome_zarr_plate(plate_value)
+                        self.well_iter = iter(plate.get_images().items())
+                    except Exception as e:
+                        logging.error(f"Failed to open plate {plate_name}: {e}")
+                        continue
 
             try:
                 well_name, well_container = next(self.well_iter)
