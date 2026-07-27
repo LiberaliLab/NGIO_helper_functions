@@ -13,8 +13,8 @@ pip install git+https://github.com/LiberaliLab/NGIO_helper_functions.git
 Clone the repo and install in editable mode:
 
 ```bash
-git clone 
-cd NGIO_helpers
+git clone https://github.com/LiberaliLab/NGIO_helper_functions.git
+cd NGIO_helper_functions
 pip install -e .
 ```
 
