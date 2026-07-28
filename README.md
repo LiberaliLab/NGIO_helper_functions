@@ -35,7 +35,31 @@ for plate_name, well_name, well in ZarrWellIterator(plates):
     ...
 ```
 
-`Formatter.collect_zarr_plates` scans a directory and builds a `{plate_name: path}` dictionary of all `.zarr` plates found. `ZarrWellIterator` then yields `(plate_name, well_name, well_container)` for every well across every plate, skipping any plate that fails to open and logging the error.
+`Formatter.collect_zarr_plates` scans a directory and builds a `{plate_name: path}` dictionary of all `.zarr` plates found. `ZarrWellIterator` then yields `(plate_name, well_name, well_container)` for every well across every plate, opening each plate as it goes, and skipping any plate that fails to open (logging the error) rather than halting the loop.
+
+### Well Sampling
+
+Randomly sample a fixed number of wells, distributed as evenly as possible across all plates — useful for spot-checking QC on a subset of a large dataset instead of reviewing every well.
+
+```python
+from ngio_helpers import Formatter, sample_wells, SampledWellIterator
+
+plates = Formatter.collect_zarr_plates("/some/path")
+subset = sample_wells(plates, n=10, seed=42)
+
+for plate_name, well_name, well in SampledWellIterator(subset):
+    ...
+```
+
+| Argument | Type | Description |
+|---|---|---|
+| `zarr_dict` | `dict[str, Path]` | `{plate_name: plate_path}` — output of `Formatter.collect_zarr_plates` |
+| `n` | `int` | Total number of wells to sample across all plates |
+| `seed` | `int`, optional | Random seed for reproducible sampling |
+
+`sample_wells` opens each plate once to discover its wells, then allocates `n` as evenly as possible across all plates (redistributing automatically if a plate has fewer wells than its even share). It returns `{plate_name: {well_name: well_container}}`, with containers already open.
+
+`SampledWellIterator` then yields `(plate_name, well_name, well_container)` from that pre-sampled dict. Unlike `ZarrWellIterator`, it does **not** re-open any plates — it simply flattens and iterates the containers `sample_wells` already opened, so use it specifically for `sample_wells` output rather than for a raw `{plate_name: plate_path}` dict.
 
 ### ROI Iterator
 
@@ -72,7 +96,7 @@ cleaned = ImageCleaning.suppress_neighbors(
 
 This is used internally by `ROIWellIterator` to produce the `_cleaned` fields above, but can also be called directly on any intensity/label crop pair.
 
-## Formatter Class 
+## Formatter Class
 
 Utility class for path discovery and metadata parsing. All methods are stateless.
 
@@ -115,23 +139,35 @@ df = Formatter.rename_FE_image_channels(df, well_container)
 
 Returns `pd.DataFrame` with channel columns renamed. Columns not matching the `<feature>-<index>` pattern are left unchanged.
 
-
-
-
 ---
 ## Project Structure
 
 ```
-NGIO_helpers/
+NGIO_helper_functions/
 ├── pyproject.toml
 └── src/
     └── ngio_helpers/
-        ├── __init__.py
-        ├── zarr_tools.py        # ZarrWellIterator, Formatter, ROIWellIterator, ImageCleaning
+        ├── __init__.py         # re-exports the public API listed below
+        ├── iterators.py        # ZarrWellIterator, SampledWellIterator, ROIWellIterator
+        ├── sampling.py          # sample_wells
+        ├── formatting.py         # Formatter
+        └── image_cleaning.py     # ImageCleaning
+```
+
+All public classes and functions are re-exported from the package root, so `from ngio_helpers import ...` works the same regardless of which submodule they actually live in:
+
+```python
+from ngio_helpers import (
+    Formatter,
+    ImageCleaning,
+    ROIWellIterator,
+    SampledWellIterator,
+    ZarrWellIterator,
+    sample_wells,
+)
 ```
 
 ## Notes
 
 - All iterators are designed to be resilient: if a single plate, well, or ROI fails to load, it is logged and skipped rather than halting the loop.
 - Contributions and additional HCS-specific utilities are welcome — open a PR or issue.
-

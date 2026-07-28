@@ -1,15 +1,7 @@
-
-import re
 import logging
 import numpy as np
-from pathlib import Path
 from ngio import open_ome_zarr_plate
-import pandas as pd
 
-#------------------------------------------------------------------------
-# Custom extensions for the NGIO ecosystem, providing high-level iterators 
-#     and formatting utilities for OME-Zarr plates.
-#------------------------------------------------------------------------
 
 class ZarrWellIterator:
     """
@@ -98,80 +90,33 @@ class ROIWellIterator:
                 logging.error(f"Failed to extract/clean ROI {roi}: {e}")
                 continue
 
-class Formatter:
-    """Utility methods for path discovery and metadata parsing."""
 
-    @staticmethod
-    def collect_zarr_plates(path_zarr):
-        """Build dict: plate_name -> path to ome-zarr plate."""
-        root = Path(path_zarr)
-        if not root.exists():
-            logging.warning(f"Path does not exist: {path_zarr}")
-            return {}
+class SampledWellIterator:
+    """
+    Iterator for pre-sampled wells with already-open containers.
 
-        return {
-            p.name: p
-            for p in root.iterdir()
-            if p.is_dir() and p.suffix == ".zarr"
-        }
-    @staticmethod
-    def rename_FE_image_channels(df, well_container):
-        """
-        Rename feature extraction dataframe columns using ome-zarr channel labels.
+    Unlike ZarrWellIterator, this does NOT call open_ome_zarr_plate —
+    it expects containers to already be open (e.g. output of sample_wells).
 
-        Converts columns like:
-            mean_intensity-0 → mean_intensity-DAPI
-            max_intensity-1 → max_intensity-Olfm4
-            ...
+    Expects: {plate_name: {well_name: well_container}}
+    Yields: (plate_name, well_name, well_container)
+    """
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Feature extraction dataframe.
-        well_container : ngio.WellContainer
-            Container holding image + channel metadata.
+    def __init__(self, sampled_dict: dict):
+        # Flatten upfront into a simple list of tuples
+        self.items = [
+            (plate_name, well_name, well_container)
+            for plate_name, wells in sampled_dict.items()
+            for well_name, well_container in wells.items()
+        ]
+        self.idx = 0
 
-        Returns
-        -------
-        df : pd.DataFrame
-            Dataframe with renamed columns.
-        """
+    def __iter__(self):
+        return self
 
-        img = well_container.get_image()
-
-        # Build index → channel name mapping
-        channel_map = {
-            img.get_channel_idx(name): name
-            for name in img.channel_labels
-        }
-
-        # Rename columns
-        def rename_col(col):
-            m = re.search(r"(.*)-(\d+)$", col)
-            if m:
-                base, idx = m.groups()
-                idx = int(idx)
-                if idx in channel_map:
-                    return f"{base}-{channel_map[idx]}"
-            return col
-
-        df = df.rename(columns=rename_col)
-
-        return df
-
-class ImageCleaning:
-    @staticmethod
-    def suppress_neighbors(intensity_crop, label_crop, target_label, background_value=None):
-        """
-        intensity_crop: (H, W) single channel
-        label_crop: (H, W) integer label map, same shape
-        target_label: the label ID of YOUR organoid (e.g. 42)
-        Removes background that is not within the label of the image
-        """
-        if background_value is None:
-            bg_mask = (label_crop == 0)
-            background_value = np.median(intensity_crop[bg_mask]) if bg_mask.any() else np.median(intensity_crop)
-        neighbor_mask = (label_crop != target_label) & (label_crop != 0)
-        cleaned = intensity_crop.copy()
-        cleaned[neighbor_mask] = background_value
-        return cleaned
+    def __next__(self):
+        if self.idx >= len(self.items):
+            raise StopIteration
+        item = self.items[self.idx]
+        self.idx += 1
+        return item
