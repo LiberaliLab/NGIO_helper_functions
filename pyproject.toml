@@ -1,6 +1,6 @@
 [project]
 name = "ngio-helpers"
-version = "0.1.0"
+version = "0.3.0"
 description = "Custom extensions and iterators for the NGIO ecosystem (OME-Zarr plates/wells)"
 requires-python = ">=3.9"
 dependencies = [
